@@ -17,54 +17,15 @@ import math
 # python: 3.7
 # opencv: 4.1.0.25
 
-# parameters
-cap_region_x_begin = 0.5  # start point/total width
-cap_region_y_end = 0.8  # start point/total width
-threshold = 60  # BINARY threshold
-blurValue = 31  # GaussianBlur parameter
-bgSubThreshold = 50
+cap_region_x_begin = 0.5  # 锚框宽度比例
+cap_region_y_end = 0.8  # 锚框高度比例
+threshold = 60  # 二值化图阈值
+blurValue = 31  # 高斯模糊卷积核边长
+bgSubThreshold = 50 # 背景分割阈值
 learningRate = 0
-cnt = 0
-# variables
-isBgCaptured = 0  # bool, whether the background captured
-triggerSwitch = False  # if true, keyborad simulator works
-def printThreshold(thr):
-    print("! Changed threshold to " + str(thr))
-
-
-def remove_background(frame, bgModel):
-    fgmask = bgModel.apply(frame, learningRate=learningRate)
-    # kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-    # res = cv2.morphologyEx(fgmask, cv2.MORPH_OPEN, kernel)
-
-    kernel = np.ones((3, 3), np.uint8)
-    fgmask = cv2.erode(fgmask, kernel, iterations=1)
-    res = cv2.bitwise_and(frame, frame, mask=fgmask)
-    return res
-
-
-def calculateFingers(res, drawing):  # -> finished bool, cnt: finger count
-    #  convexity defect
-    hull = cv2.convexHull(res, returnPoints=False)
-    if len(hull) > 3:
-        defects = cv2.convexityDefects(res, hull)
-        if type(defects) != type(None):  # avoid crashing.   (BUG not found)
-
-            cnt = 0
-            for i in range(defects.shape[0]):  # calculate the angle
-                s, e, f, d = defects[i, 0]
-                start = tuple(res[s, 0])
-                end = tuple(res[e, 0])
-                far = tuple(res[f, 0])
-                a = math.sqrt((end[0] - start[0]) ** 2 + (end[1] - start[1]) ** 2)
-                b = math.sqrt((far[0] - start[0]) ** 2 + (far[1] - start[1]) ** 2)
-                c = math.sqrt((end[0] - far[0]) ** 2 + (end[1] - far[1]) ** 2)
-                angle = math.acos((b ** 2 + c ** 2 - a ** 2) / (2 * b * c))  # cosine theorem
-                if angle <= math.pi / 2:  # angle less than 90 degree, treat as fingers
-                    cnt += 1
-                    cv2.circle(drawing, far, 8, (255, 0, 0), -1)
-            return True, cnt
-    return False, 0
+cnt = 0  # 凸缺陷计数
+isBgCaptured = 0  # 布尔值，背景是否被捕获
+#triggerSwitch = False
 
 pi = 3.14
 SCREEN_WIDTH = 288
@@ -82,19 +43,19 @@ SCREEN = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 background_day = pygame.image.load('flappybird/banana2.png').convert_alpha()
 
 bird = [pygame.image.load('assets/sprites/redbird-upflap.png').convert_alpha(),
-		pygame.image.load('assets/sprites/redbird-midflap.png').convert_alpha(),
-		pygame.image.load('assets/sprites/redbird-downflap.png').convert_alpha()]
+        pygame.image.load('assets/sprites/redbird-midflap.png').convert_alpha(),
+        pygame.image.load('assets/sprites/redbird-downflap.png').convert_alpha()]
 
 number = [pygame.image.load('assets/sprites/0.png').convert_alpha(),
-		  pygame.image.load('assets/sprites/1.png').convert_alpha(),
-		  pygame.image.load('assets/sprites/2.png').convert_alpha(),
-      	  pygame.image.load('assets/sprites/3.png').convert_alpha(),
-		  pygame.image.load('assets/sprites/4.png').convert_alpha(),
-	      pygame.image.load('assets/sprites/5.png').convert_alpha(),
-	      pygame.image.load('assets/sprites/6.png').convert_alpha(),
-		  pygame.image.load('assets/sprites/7.png').convert_alpha(),
-		  pygame.image.load('assets/sprites/8.png').convert_alpha(),
-		  pygame.image.load('assets/sprites/9.png').convert_alpha()]
+          pygame.image.load('assets/sprites/1.png').convert_alpha(),
+          pygame.image.load('assets/sprites/2.png').convert_alpha(),
+          pygame.image.load('assets/sprites/3.png').convert_alpha(),
+          pygame.image.load('assets/sprites/4.png').convert_alpha(),
+          pygame.image.load('assets/sprites/5.png').convert_alpha(),
+          pygame.image.load('assets/sprites/6.png').convert_alpha(),
+          pygame.image.load('assets/sprites/7.png').convert_alpha(),
+          pygame.image.load('assets/sprites/8.png').convert_alpha(),
+          pygame.image.load('assets/sprites/9.png').convert_alpha()]
 # 地面图
 ground = pygame.image.load('assets/sprites/base.png').convert_alpha()
 # 开场动画
@@ -110,14 +71,51 @@ if "win" in sys.platform:
 else:
     soundExt = 'ogg'
 
-
-sound_wing 	= pygame.mixer.Sound('assets/audio/wing'+soundExt)
-sound_hit 	= pygame.mixer.Sound('assets/audio/hit'+soundExt)
-sound_point = pygame.mixer.Sound('assets/audio/point'+soundExt)
-sound_die 	= pygame.mixer.Sound('assets/audio/die'+soundExt)
+sound_wing = pygame.mixer.Sound('assets/audio/wing' + soundExt)
+sound_hit = pygame.mixer.Sound('assets/audio/hit' + soundExt)
+sound_point = pygame.mixer.Sound('assets/audio/point' + soundExt)
+sound_die = pygame.mixer.Sound('assets/audio/die' + soundExt)
 
 # 取game over文本
 text_game_over = pygame.image.load('flappybird/text_game_over.png').convert_alpha()
+
+def printThreshold(thr):
+    print("! Changed threshold to " + str(thr))
+
+
+def remove_background(frame, bgModel):
+    fgmask = bgModel.apply(frame, learningRate=learningRate)
+    # kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+    # res = cv2.morphologyEx(fgmask, cv2.MORPH_OPEN, kernel)
+
+    kernel = np.ones((3, 3), np.uint8)
+    fgmask = cv2.erode(fgmask, kernel, iterations=1)
+    res = cv2.bitwise_and(frame, frame, mask=fgmask)
+    return res
+
+
+def calculateFingers(res, drawing):  # 返回-> 是否检测到手指判断 , cnt: 手凸缺陷计数
+    #  convexity defect
+    hull = cv2.convexHull(res, returnPoints=False)
+    if len(hull) > 3:
+        defects = cv2.convexityDefects(res, hull)
+        if type(defects) != type(None):  # 存在凸缺陷
+
+            cnt = 0
+            for i in range(defects.shape[0]):  # 计算凸缺陷角度
+                s, e, f, d = defects[i, 0]
+                start = tuple(res[s, 0])
+                end = tuple(res[e, 0])
+                far = tuple(res[f, 0])
+                a = math.sqrt((end[0] - start[0]) ** 2 + (end[1] - start[1]) ** 2)
+                b = math.sqrt((far[0] - start[0]) ** 2 + (far[1] - start[1]) ** 2)
+                c = math.sqrt((end[0] - far[0]) ** 2 + (end[1] - far[1]) ** 2)
+                angle = math.acos((b ** 2 + c ** 2 - a ** 2) / (2 * b * c))  # cosine theorem
+                if angle <= math.pi / 2:  # angle less than 90 degree, treat as fingers
+                    cnt += 1
+                    cv2.circle(drawing, far, 8, (255, 0, 0), -1)
+            return True, cnt
+    return False, 0
 
 def showScore(score):
     # 拆分数字
@@ -136,18 +134,19 @@ def showScore(score):
 
 def main():
     global isBgCaptured
+
     # 创建帧率实例
     FPS = pygame.time.Clock()
     # 迭代器 小鸟翅膀 0-1-2-1-0循环
-    wing_position_iter = cycle([0,1,2,1])
+    wing_position_iter = cycle([0, 1, 2, 1])
     wing_position = 0
     # 迭代器 小鸟上下抖动
-    bird_shake_iter = cycle([0,1,2,3,4,3,2,1,0,-1,-2,-3,-4,-3,-2,-1])
+    bird_shake_iter = cycle([0, 1, 2, 3, 4, 3, 2, 1, 0, -1, -2, -3, -4, -3, -2, -1])
     bird_shake = 0
 
-    bird_position = int(0.5 * SCREEN_HEIGHT)   # 小鸟起始高度
-    bird_x_position = int(0.2 * SCREEN_WIDTH)   #小鸟水平位置
-    ground_position = int(0.8 * SCREEN_HEIGHT - bird[0].get_height())   # 地面高度
+    bird_position = int(0.5 * SCREEN_HEIGHT)  # 小鸟起始高度
+    bird_x_position = int(0.2 * SCREEN_WIDTH)  # 小鸟水平位置
+    ground_position = int(0.8 * SCREEN_HEIGHT - bird[0].get_height())  # 地面高度
 
     fps_count = 0  # 帧数处理
     key_down = 0  # 按键按下
@@ -191,6 +190,8 @@ def main():
         elif k == 27:  # 按ESC退出
             cap.release()
             cv2.destroyAllWindows()
+            pygame.quit()
+            sys.exit()
             break
         elif k == ord('r'): # 按r重置游戏
             game_state = ANIMATION
@@ -297,7 +298,7 @@ def main():
                 bird_shake = next(bird_shake_iter)
                 # 小鸟受重力下落, 按键按下则上升
                 if key_down:
-                    # 刷新的过程需要key_down递减之0 用几帧画面完成
+                    # 刷新的过程需要key_down递减至0 用几帧画面完成
                     key_down -= 1
                     bird_position -= 6
                     bird_position = max(0, bird_position)  # 边界检测
