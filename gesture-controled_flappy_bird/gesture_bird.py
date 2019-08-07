@@ -224,7 +224,7 @@ def main():
                 cv2.drawContours(drawing, [hull], 0, (0,0,255), 4)
                 isFinishCal, cnt = calculateFingers(res, drawing)
                 cv2.imshow('output', drawing)
-            if isFinishCal is True and cnt > 3:   # 如果检测到5个手指，根据不同状态改变相应变量
+            if isFinishCal is True and cnt > 2:   # 如果检测到至少4个手指，根据不同状态改变相应变量
                 if game_state == ANIMATION:
                     game_state = RUNNING
                     down_velocity = 0  # 下降速度
